@@ -29,7 +29,11 @@ class LoggerClosureHelper
             $lastStep = null;
             $current = 0;
 
-            return function ($increment, $totalObjects) use ($output, $message, $messageParams, &$lastStep, &$current) {
+            return function ($increment, $totalObjects = null) use ($output, $message, $messageParams, &$lastStep, &$current) {
+                if (! intval($increment) && is_null($totalObjects)) {
+                    $output->writeln($increment);
+                    return;
+                }
                 if ($current + $increment > $totalObjects) {
                     $increment = $totalObjects - $current;
                 }
@@ -61,7 +65,11 @@ class LoggerClosureHelper
         ProgressBar::setFormatDefinition('debug', " %current%/%max% [%bar%] %percent:3s%% %elapsed:6s%/%estimated:-6s% %memory:6s%\n%message%");
         $progress = null;
 
-        return function ($increment, $totalObjects) use (&$progress, $output, $message, $messageParams) {
+        return function ($increment, $totalObjects = null) use (&$progress, $output, $message, $messageParams) {
+            if (! intval($increment) && is_null($totalObjects)) {
+                $output->writeln($increment);
+                return;
+            }
             if (null === $progress) {
                 $output->writeln('');
                 $progress = new ProgressBar($output, $totalObjects);

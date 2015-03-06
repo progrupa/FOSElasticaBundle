@@ -57,6 +57,7 @@ abstract class AbstractProvider extends BaseAbstractProvider
 
         for (; $offset < $nbObjects; $offset += $batchSize) {
             $objects = $this->fetchSlice($queryBuilder, $batchSize, $offset);
+            $processedCount = count($objects);
             $objects = array_filter($objects, array($this, 'isObjectIndexable'));
 
             if ($objects) {
@@ -80,7 +81,7 @@ abstract class AbstractProvider extends BaseAbstractProvider
             usleep($sleep);
 
             if ($loggerClosure) {
-                $loggerClosure(count($objects), $nbObjects);
+                $loggerClosure($processedCount, $nbObjects);
             }
         }
 
