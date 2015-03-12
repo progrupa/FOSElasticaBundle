@@ -16,7 +16,7 @@ use FOS\ElasticaBundle\Configuration\ConfigManager;
 use FOS\ElasticaBundle\Elastica\Index;
 use FOS\ElasticaBundle\Index\AliasProcessor;
 use FOS\ElasticaBundle\Index\IndexManager;
-use FOS\ElasticaBundle\Index\Reindexer;
+use FOS\ElasticaBundle\Index\Copier;
 use FOS\ElasticaBundle\Index\Resetter;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Helper\ProgressBar;
@@ -47,9 +47,9 @@ class ReindexCommand extends ContainerAwareCommand
     private $resetter;
 
     /**
-     * @var Reindexer
+     * @var Copier
      */
-    private $reindexer;
+    private $copier;
 
     /**
      * @var ProgressClosureBuilder
@@ -80,7 +80,7 @@ class ReindexCommand extends ContainerAwareCommand
         $this->configManager = $this->getContainer()->get('fos_elastica.config_manager');
         $this->indexManager = $this->getContainer()->get('fos_elastica.index_manager');
         $this->resetter = $this->getContainer()->get('fos_elastica.resetter');
-        $this->reindexer = $this->getContainer()->get('fos_elastica.reindexer');
+        $this->copier = $this->getContainer()->get('fos_elastica.copier');
 	    $this->progressClosureBuilder = new ProgressClosureBuilder();
 
 	    if (!$input->getOption('no-overwrite-format')) {
@@ -147,7 +147,7 @@ class ReindexCommand extends ContainerAwareCommand
 
         $startTime = $this->militime();
 
-        $this->reindexer->copyDocuments(
+        $this->copier->copyDocuments(
             $oldIndex,
             $newIndex,
             $this->progressClosureBuilder->build($output, '<info>Reindexing</info> <comment>%s</comment>', array($indexName)),
@@ -159,7 +159,7 @@ class ReindexCommand extends ContainerAwareCommand
 
         $output->writeln(sprintf('<info>Updating changes made during reindex</info>'));
 
-        $postPopulateErrors = $this->reindexer->copyDocuments(
+        $postPopulateErrors = $this->copier->copyDocuments(
             $oldIndex,
             $newIndex,
             $this->progressClosureBuilder->build($output, '<info>Updating changes</info>'),
