@@ -1,9 +1,11 @@
 <?php
 /**
- * Created by PhpStorm.
- * User: dominikkasprzak
- * Date: 27/02/15
- * Time: 08:49
+ * This file is part of the FOSElasticaBundle project.
+ *
+ * (c) Tim Nagel <tim@nagel.com.au>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
  */
 
 namespace FOS\ElasticaBundle\Command;
@@ -14,9 +16,10 @@ use FOS\ElasticaBundle\Configuration\ConfigManager;
 use FOS\ElasticaBundle\Elastica\Index;
 use FOS\ElasticaBundle\Index\AliasProcessor;
 use FOS\ElasticaBundle\Index\IndexManager;
-use FOS\ElasticaBundle\Index\Reindexer;
+use FOS\ElasticaBundle\Index\Copier;
 use FOS\ElasticaBundle\Index\Resetter;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
+use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -44,14 +47,14 @@ class ReindexCommand extends ContainerAwareCommand
     private $resetter;
 
     /**
-     * @var Reindexer
+     * @var Copier
      */
-    private $reindexer;
+    private $copier;
 
     /**
-     * @var LoggerClosureHelper
+     * @var ProgressClosureBuilder
      */
-    private $loggerClosureHelper;
+    private $progressClosureBuilder;
 
     /**
      * @see Symfony\Component\Console\Command\Command::configure()
@@ -63,7 +66,8 @@ class ReindexCommand extends ContainerAwareCommand
             ->addOption('index', null, InputOption::VALUE_OPTIONAL, 'The index to reindex')
             ->addOption('batch-size', null, InputOption::VALUE_REQUIRED, 'Index packet size')
             ->addOption('ignore-errors', null, InputOption::VALUE_NONE, 'Do not stop on errors')
-            ->setDescription('Reindex one or all ElasticSearch indices')
+	        ->addOption('no-overwrite-format', null, InputOption::VALUE_NONE, 'Prevent this command from overwriting ProgressBar\'s formats')
+	        ->setDescription('Reindex one or all ElasticSearch indices')
         ;
     }
 
@@ -76,8 +80,15 @@ class ReindexCommand extends ContainerAwareCommand
         $this->configManager = $this->getContainer()->get('fos_elastica.config_manager');
         $this->indexManager = $this->getContainer()->get('fos_elastica.index_manager');
         $this->resetter = $this->getContainer()->get('fos_elastica.resetter');
-        $this->reindexer = $this->getContainer()->get('fos_elastica.reindexer');
-        $this->loggerClosureHelper = new LoggerClosureHelper();
+        $this->copier = $this->getContainer()->get('fos_elastica.copier');
+	    $this->progressClosureBuilder = new ProgressClosureBuilder();
+
+	    if (!$input->getOption('no-overwrite-format')) {
+		    ProgressBar::setFormatDefinition('normal', " %current%/%max% [%bar%] %percent:3s%%\n%message%");
+		    ProgressBar::setFormatDefinition('verbose', " %current%/%max% [%bar%] %percent:3s%% %elapsed:6s%\n%message%");
+		    ProgressBar::setFormatDefinition('very_verbose', " %current%/%max% [%bar%] %percent:3s%% %elapsed:6s%/%estimated:-6s%\n%message%");
+		    ProgressBar::setFormatDefinition('debug', " %current%/%max% [%bar%] %percent:3s%% %elapsed:6s%/%estimated:-6s% %memory:6s%\n%message%");
+	    }
     }
 
     /**
@@ -136,10 +147,10 @@ class ReindexCommand extends ContainerAwareCommand
 
         $startTime = $this->militime();
 
-        $this->reindexer->copyDocuments(
+        $this->copier->copyDocuments(
             $oldIndex,
             $newIndex,
-            $this->loggerClosureHelper->getLoggerClosure($output, '<info>Reindexing</info> <comment>%s</comment>', array($indexName)),
+            $this->progressClosureBuilder->build($output, '<info>Reindexing</info> <comment>%s</comment>', array($indexName)),
             $options
         );
 
@@ -148,10 +159,10 @@ class ReindexCommand extends ContainerAwareCommand
 
         $output->writeln(sprintf('<info>Updating changes made during reindex</info>'));
 
-        $postPopulateErrors = $this->reindexer->copyDocuments(
+        $postPopulateErrors = $this->copier->copyDocuments(
             $oldIndex,
             $newIndex,
-            $this->loggerClosureHelper->getLoggerClosure($output, '<info>Updating changes</info>'),
+            $this->progressClosureBuilder->build($output, '<info>Updating changes</info>'),
             array_merge($options, array('ignore-errors' => true)),  //  Errors are possible due to version colisions.
             array('range' => array('_timestamp' => array('gt' => $startTime)))
         );
