@@ -11,7 +11,7 @@ use FOS\ElasticaBundle\Event\TypeResetEvent;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 /**
- * Deletes and recreates indexes
+ * Deletes and recreates indexes.
  */
 class Resetter
 {
@@ -62,7 +62,7 @@ class Resetter
     }
 
     /**
-     * Deletes and recreates all indexes
+     * Deletes and recreates all indexes.
      *
      * @param bool $populating
      * @param bool $force
@@ -79,17 +79,18 @@ class Resetter
      * with a randomised name for an alias to be set after population.
      *
      * @param string $indexName
-     * @param bool $populating
-     * @param bool $force If index exists with same name as alias, remove it
+     * @param bool   $populating
+     * @param bool   $force      If index exists with same name as alias, remove it
+     *
      * @throws \InvalidArgumentException if no index exists for the given name
      */
     public function resetIndex($indexName, $populating = false, $force = false)
     {
-        $event = new IndexResetEvent($indexName, $populating, $force);
-        $this->dispatcher->dispatch(IndexResetEvent::PRE_INDEX_RESET, $event);
-
         $indexConfig = $this->configManager->getIndexConfiguration($indexName);
         $index = $this->indexManager->getIndex($indexName);
+
+        $event = new IndexResetEvent($indexName, $populating, $force);
+        $this->dispatcher->dispatch(IndexResetEvent::PRE_INDEX_RESET, $event);
 
         if ($indexConfig->isUseAlias()) {
             $this->aliasProcessor->setRootName($indexConfig, $index);
@@ -106,20 +107,21 @@ class Resetter
     }
 
     /**
-     * Deletes and recreates a mapping type for the named index
+     * Deletes and recreates a mapping type for the named index.
      *
      * @param string $indexName
      * @param string $typeName
+     *
      * @throws \InvalidArgumentException if no index or type mapping exists for the given names
      * @throws ResponseException
      */
     public function resetIndexType($indexName, $typeName)
     {
-        $event = new TypeResetEvent($indexName, $typeName);
-        $this->dispatcher->dispatch(TypeResetEvent::PRE_TYPE_RESET, $event);
-
         $typeConfig = $this->configManager->getTypeConfiguration($indexName, $typeName);
         $type = $this->indexManager->getIndex($indexName)->getType($typeName);
+
+        $event = new TypeResetEvent($indexName, $typeName);
+        $this->dispatcher->dispatch(TypeResetEvent::PRE_TYPE_RESET, $event);
 
         try {
             $type->delete();

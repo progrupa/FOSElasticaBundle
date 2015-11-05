@@ -3,6 +3,7 @@
 namespace FOS\ElasticaBundle\Propel;
 
 use FOS\ElasticaBundle\HybridResult;
+use FOS\ElasticaBundle\Transformer\AbstractElasticaToModelTransformer;
 use FOS\ElasticaBundle\Transformer\ElasticaToModelTransformerInterface;
 use Symfony\Component\PropertyAccess\PropertyAccessorInterface;
 
@@ -14,7 +15,7 @@ use Symfony\Component\PropertyAccess\PropertyAccessorInterface;
  *
  * @author William Durand <william.durand1@gmail.com>
  */
-class ElasticaToModelTransformer implements ElasticaToModelTransformerInterface
+class ElasticaToModelTransformer extends AbstractElasticaToModelTransformer
 {
     /**
      * Propel model class to map to Elastica documents.
@@ -34,17 +35,10 @@ class ElasticaToModelTransformer implements ElasticaToModelTransformerInterface
     );
 
     /**
-     * PropertyAccessor instance.
-     *
-     * @var PropertyAccessorInterface
-     */
-    protected $propertyAccessor;
-
-    /**
      * Constructor.
      *
      * @param string $objectClass
-     * @param array $options
+     * @param array  $options
      */
     public function __construct($objectClass, array $options = array())
     {
@@ -53,20 +47,11 @@ class ElasticaToModelTransformer implements ElasticaToModelTransformerInterface
     }
 
     /**
-     * Set the PropertyAccessor instance.
-     *
-     * @param PropertyAccessorInterface $propertyAccessor
-     */
-    public function setPropertyAccessor(PropertyAccessorInterface $propertyAccessor)
-    {
-        $this->propertyAccessor = $propertyAccessor;
-    }
-
-    /**
      * Transforms an array of Elastica document into an array of Propel entities
      * fetched from the database.
      *
      * @param array $elasticaObjects
+     *
      * @return array|\ArrayObject
      */
     public function transform(array $elasticaObjects)
@@ -81,11 +66,7 @@ class ElasticaToModelTransformer implements ElasticaToModelTransformerInterface
         // Sort objects in the order of their IDs
         $idPos = array_flip($ids);
         $identifier = $this->options['identifier'];
-        $propertyAccessor = $this->propertyAccessor;
-
-        $sortCallback = function($a, $b) use ($idPos, $identifier, $propertyAccessor) {
-            return $idPos[$propertyAccessor->getValue($a, $identifier)] > $idPos[$propertyAccessor->getValue($b, $identifier)];
-        };
+        $sortCallback = $this->getSortingClosure($idPos, $identifier);
 
         if (is_object($objects)) {
             $objects->uasort($sortCallback);
@@ -104,7 +85,7 @@ class ElasticaToModelTransformer implements ElasticaToModelTransformerInterface
         $objects = $this->transform($elasticaObjects);
 
         $result = array();
-        for ($i = 0; $i < count($elasticaObjects); $i++) {
+        for ($i = 0, $j = count($elasticaObjects); $i < $j; $i++) {
             $result[] = new HybridResult($elasticaObjects[$i], $objects[$i]);
         }
 
@@ -135,6 +116,7 @@ class ElasticaToModelTransformer implements ElasticaToModelTransformerInterface
      *
      * @param array   $identifierValues Identifier values
      * @param boolean $hydrate          Whether or not to hydrate the results
+     *
      * @return array
      */
     protected function findByIdentifiers(array $identifierValues, $hydrate)
@@ -145,7 +127,7 @@ class ElasticaToModelTransformer implements ElasticaToModelTransformerInterface
 
         $query = $this->createQuery($this->objectClass, $this->options['identifier'], $identifierValues);
 
-        if ( ! $hydrate) {
+        if (! $hydrate) {
             return $query->toArray();
         }
 
@@ -158,6 +140,7 @@ class ElasticaToModelTransformer implements ElasticaToModelTransformerInterface
      * @param string $class            Propel model class
      * @param string $identifierField  Identifier field name (e.g. "id")
      * @param array  $identifierValues Identifier values
+     *
      * @return \ModelCriteria
      */
     protected function createQuery($class, $identifierField, array $identifierValues)
@@ -170,6 +153,7 @@ class ElasticaToModelTransformer implements ElasticaToModelTransformerInterface
 
     /**
      * @see https://github.com/doctrine/common/blob/master/lib/Doctrine/Common/Util/Inflector.php
+     *
      * @param string $str
      */
     private function camelize($str)

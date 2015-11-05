@@ -17,10 +17,6 @@ class AbstractProviderTest extends \PHPUnit_Framework_TestCase
 
     public function setUp()
     {
-        if (!interface_exists('Doctrine\Common\Persistence\ManagerRegistry')) {
-            $this->markTestSkipped('Doctrine Common is not available.');
-        }
-
         $this->objectClass = 'objectClass';
         $this->options = array('debug_logging' => true, 'indexName' => 'index', 'typeName' => 'type');
 
@@ -62,7 +58,6 @@ class AbstractProviderTest extends \PHPUnit_Framework_TestCase
             ->with('index', 'type', $this->anything())
             ->will($this->returnValue(true));
 
-        $providerInvocationOffset = 2;
         $previousSlice = array();
 
         foreach ($objectsByIteration as $i => $objects) {
@@ -135,7 +130,7 @@ class AbstractProviderTest extends \PHPUnit_Framework_TestCase
         return array(
             array(
                 100,
-                array(range(1,100)),
+                array(range(1, 100)),
                 100,
             ),
             array(
@@ -257,7 +252,7 @@ class AbstractProviderTest extends \PHPUnit_Framework_TestCase
 
         $this->setExpectedException('Elastica\Exception\Bulk\ResponseException');
 
-        $provider->populate(null, array('ignore-errors' => false));
+        $provider->populate(null, array('ignore_errors' => false));
     }
 
     public function testPopulateRunsIndexCallable()
@@ -283,10 +278,9 @@ class AbstractProviderTest extends \PHPUnit_Framework_TestCase
             ->with('index', 'type', 2)
             ->will($this->returnValue(true));
 
-
         $this->objectPersister->expects($this->once())
             ->method('insertMany')
-            ->with(array(1 => 2));
+            ->with(array(2));
 
         $provider->populate();
     }
@@ -314,7 +308,7 @@ class AbstractProviderTest extends \PHPUnit_Framework_TestCase
     private function getMockBulkResponseException()
     {
         return $this->getMock('Elastica\Exception\Bulk\ResponseException', null, array(
-            new ResponseSet(new Response(array()), array())
+            new ResponseSet(new Response(array()), array()),
         ));
     }
 
@@ -331,7 +325,7 @@ class AbstractProviderTest extends \PHPUnit_Framework_TestCase
      */
     private function getMockObjectManager()
     {
-        $mock = $this->getMock(__NAMESPACE__ . '\ObjectManager');
+        $mock = $this->getMock(__NAMESPACE__.'\ObjectManager');
 
         $mock->expects($this->any())
             ->method('getClassMetadata')
@@ -375,7 +369,7 @@ class AbstractProviderTest extends \PHPUnit_Framework_TestCase
  */
 interface ObjectManager
 {
-    function clear();
-    function getClassMetadata();
-    function getIdentifierFieldNames();
+    public function clear();
+    public function getClassMetadata();
+    public function getIdentifierFieldNames();
 }

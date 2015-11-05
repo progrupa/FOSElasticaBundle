@@ -21,7 +21,7 @@ class IndexableTest extends \PHPUnit_Framework_TestCase
     public function testIndexableUnknown()
     {
         $indexable = new Indexable(array(), $this->container);
-        $index = $indexable->isObjectIndexable('index', 'type', new Entity);
+        $index = $indexable->isObjectIndexable('index', 'type', new Entity());
 
         $this->assertTrue($index);
     }
@@ -32,9 +32,9 @@ class IndexableTest extends \PHPUnit_Framework_TestCase
     public function testValidIndexableCallbacks($callback, $return)
     {
         $indexable = new Indexable(array(
-            'index/type' => $callback
+            'index/type' => $callback,
         ), $this->container);
-        $index = $indexable->isObjectIndexable('index', 'type', new Entity);
+        $index = $indexable->isObjectIndexable('index', 'type', new Entity());
 
         $this->assertEquals($return, $index);
     }
@@ -46,15 +46,16 @@ class IndexableTest extends \PHPUnit_Framework_TestCase
     public function testInvalidIsIndexableCallbacks($callback)
     {
         $indexable = new Indexable(array(
-            'index/type' => $callback
+            'index/type' => $callback,
         ), $this->container);
-        $indexable->isObjectIndexable('index', 'type', new Entity);
+        $indexable->isObjectIndexable('index', 'type', new Entity());
     }
 
     public function provideInvalidIsIndexableCallbacks()
     {
         return array(
             array('nonexistentEntityMethod'),
+            array(array('@indexableService', 'internalMethod')),
             array(array(new IndexableDecider(), 'internalMethod')),
             array(42),
             array('entity.getIsIndexable() && nonexistentEntityFunction()'),
@@ -67,10 +68,13 @@ class IndexableTest extends \PHPUnit_Framework_TestCase
             array('isIndexable', false),
             array(array(new IndexableDecider(), 'isIndexable'), true),
             array(array('@indexableService', 'isIndexable'), true),
-            array(function(Entity $entity) { return $entity->maybeIndex(); }, true),
+            array(array('@indexableService'), true),
+            array(function (Entity $entity) { return $entity->maybeIndex(); }, true),
             array('entity.maybeIndex()', true),
             array('!object.isIndexable() && entity.property == "abc"', true),
             array('entity.property != "abc"', false),
+            array('["array", "values"]', true),
+            array('[]', false)
         );
     }
 
@@ -110,5 +114,10 @@ class IndexableDecider
 
     protected function internalMethod()
     {
+    }
+
+    public function __invoke($object)
+    {
+        return true;
     }
 }

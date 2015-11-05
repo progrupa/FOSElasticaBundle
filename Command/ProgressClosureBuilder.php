@@ -21,9 +21,10 @@ class ProgressClosureBuilder
      * line.
      *
      * @param OutputInterface $output
-     * @param string $action
-     * @param string $index
-     * @param string $type
+     * @param string          $action
+     * @param string          $index
+     * @param string          $type
+     *
      * @return callable
      */
     public function build(OutputInterface $output, $action, array $actionParameters = array())
@@ -59,9 +60,10 @@ class ProgressClosureBuilder
      * methods to support what we need.
      *
      * @param OutputInterface $output
-     * @param string $action
-     * @param string $index
-     * @param string $type
+     * @param string          $action
+     * @param string          $index
+     * @param string          $type
+     *
      * @return callable
      */
     private function buildLegacy(OutputInterface $output, $actionMessage)

@@ -29,9 +29,10 @@ class Provider extends AbstractProvider
     }
 
     /**
-     * Reenables the logger with the previously returned logger from disableLogging();
+     * Reenables the logger with the previously returned logger from disableLogging();.
      *
      * @param mixed $logger
+     *
      * @return mixed
      */
     protected function enableLogging($logger)
@@ -45,7 +46,7 @@ class Provider extends AbstractProvider
     }
 
     /**
-     * @see FOS\ElasticaBundle\Doctrine\AbstractProvider::countObjects()
+     * {@inheritDoc}
      */
     protected function countObjects($queryBuilder)
     {
@@ -68,7 +69,9 @@ class Provider extends AbstractProvider
     }
 
     /**
-     * @see FOS\ElasticaBundle\Doctrine\AbstractProvider::fetchSlice()
+     * This method should remain in sync with SliceFetcher::fetch until it is deprecated and removed.
+     *
+     * {@inheritDoc}
      */
     protected function fetchSlice($queryBuilder, $limit, $offset)
     {
@@ -76,8 +79,8 @@ class Provider extends AbstractProvider
             throw new InvalidArgumentTypeException($queryBuilder, 'Doctrine\ORM\QueryBuilder');
         }
 
-        /**
-         * An orderBy DQL  part is required to avoid feching the same row twice.
+        /*
+         * An orderBy DQL  part is required to avoid fetching the same row twice.
          * @see http://stackoverflow.com/questions/6314879/does-limit-offset-length-require-order-by-for-pagination
          * @see http://www.postgresql.org/docs/current/static/queries-limit.html
          * @see http://www.sqlite.org/lang_select.html#orderby
@@ -102,14 +105,14 @@ class Provider extends AbstractProvider
     }
 
     /**
-     * @see FOS\ElasticaBundle\Doctrine\AbstractProvider::createQueryBuilder()
+     * {@inheritDoc}
      */
-    protected function createQueryBuilder()
+    protected function createQueryBuilder($method)
     {
         return $this->managerRegistry
             ->getManagerForClass($this->objectClass)
             ->getRepository($this->objectClass)
             // ORM query builders require an alias argument
-            ->{$this->options['query_builder_method']}(static::ENTITY_ALIAS);
+            ->{$method}(static::ENTITY_ALIAS);
     }
 }

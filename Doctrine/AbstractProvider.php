@@ -7,6 +7,7 @@ use Elastica\Exception\Bulk\ResponseException as BulkResponseException;
 use FOS\ElasticaBundle\Persister\ObjectPersisterInterface;
 use FOS\ElasticaBundle\Provider\AbstractProvider as BaseAbstractProvider;
 use FOS\ElasticaBundle\Provider\IndexableInterface;
+use Symfony\Component\OptionsResolver\OptionsResolver;
 
 abstract class AbstractProvider extends BaseAbstractProvider
 {
@@ -24,81 +25,118 @@ abstract class AbstractProvider extends BaseAbstractProvider
      * Constructor.
      *
      * @param ObjectPersisterInterface $objectPersister
-     * @param IndexableInterface $indexable
-     * @param string $objectClass
-     * @param array $options
-     * @param ManagerRegistry $managerRegistry
-     * @param SliceFetcherInterface $sliceFetcher
+     * @param IndexableInterface       $indexable
+     * @param string                   $objectClass
+     * @param array                    $baseOptions
+     * @param ManagerRegistry          $managerRegistry
+     * @param SliceFetcherInterface    $sliceFetcher
      */
     public function __construct(
         ObjectPersisterInterface $objectPersister,
         IndexableInterface $indexable,
         $objectClass,
-        array $options,
+        array $baseOptions,
         ManagerRegistry $managerRegistry,
         SliceFetcherInterface $sliceFetcher = null
     ) {
-        parent::__construct($objectPersister, $indexable, $objectClass, array_merge(array(
-            'clear_object_manager' => true,
-            'debug_logging'        => false,
-            'ignore_errors'        => false,
-            'query_builder_method' => 'createQueryBuilder',
-        ), $options));
+        parent::__construct($objectPersister, $indexable, $objectClass, $baseOptions);
 
         $this->managerRegistry = $managerRegistry;
         $this->sliceFetcher = $sliceFetcher;
     }
 
     /**
+     * Counts objects that would be indexed using the query builder.
+     *
+     * @param object $queryBuilder
+     *
+     * @return integer
+     */
+    abstract protected function countObjects($queryBuilder);
+
+    /**
+     * Creates the query builder, which will be used to fetch objects to index.
+     *
+     * @param string $method
+     *
+     * @return object
+     */
+    abstract protected function createQueryBuilder($method);
+
+    /**
+     * Fetches a slice of objects using the query builder.
+     *
+     * @param object  $queryBuilder
+     * @param integer $limit
+     * @param integer $offset
+     *
+     * @return array
+     */
+    abstract protected function fetchSlice($queryBuilder, $limit, $offset);
+
+    /**
      * {@inheritDoc}
      */
-    public function populate(\Closure $loggerClosure = null, array $options = array())
+    protected function doPopulate($options, \Closure $loggerClosure = null)
     {
-        if (!$this->options['debug_logging']) {
-            $logger = $this->disableLogging();
-        }
-
-        $queryBuilder = $this->createQueryBuilder();
-        $nbObjects = $this->countObjects($queryBuilder);
-        $offset = isset($options['offset']) ? intval($options['offset']) : 0;
-        $sleep = isset($options['sleep']) ? intval($options['sleep']) : 0;
-        $batchSize = isset($options['batch-size']) ? intval($options['batch-size']) : $this->options['batch_size'];
-        $ignoreErrors = isset($options['ignore-errors']) ? $options['ignore-errors'] : $this->options['ignore_errors'];
         $manager = $this->managerRegistry->getManagerForClass($this->objectClass);
 
-        $objects = array();
-        for (; $offset < $nbObjects; $offset += $batchSize) {
-            $objects = $this->getSlice($queryBuilder, $batchSize, $offset, $objects);
-            $objects = array_filter($objects, array($this, 'isObjectIndexable'));
+        $queryBuilder = $this->createQueryBuilder($options['query_builder_method']);
+        $nbObjects = $this->countObjects($queryBuilder);
+        $offset = $options['offset'];
 
-            if ($objects) {
-                if (!$ignoreErrors) {
+        $objects = array();
+        for (; $offset < $nbObjects; $offset += $options['batch_size']) {
+            $sliceSize = $options['batch_size'];
+            try {
+                $objects = $this->getSlice($queryBuilder, $options['batch_size'], $offset, $objects);
+                $sliceSize = count($objects);
+                $objects = $this->filterObjects($options, $objects);
+
+                if (!empty($objects)) {
                     $this->objectPersister->insertMany($objects);
-                } else {
-                    try {
-                        $this->objectPersister->insertMany($objects);
-                    } catch(BulkResponseException $e) {
-                        if ($loggerClosure) {
-                            $loggerClosure($batchSize, $nbObjects, sprintf('<error>%s</error>', $e->getMessage()));
-                        }
-                    }
+                }
+            } catch (BulkResponseException $e) {
+                if (!$options['ignore_errors']) {
+                    throw $e;
+                }
+
+                if (null !== $loggerClosure) {
+                    $loggerClosure(
+                        $options['batch_size'],
+                        $nbObjects,
+                        sprintf('<error>%s</error>', $e->getMessage())
+                    );
                 }
             }
 
-            if ($this->options['clear_object_manager']) {
+            if ($options['clear_object_manager']) {
                 $manager->clear();
             }
 
-            usleep($sleep);
+            usleep($options['sleep']);
 
-            if ($loggerClosure) {
-                $loggerClosure($batchSize, $nbObjects);
+            if (null !== $loggerClosure) {
+                $loggerClosure($sliceSize, $nbObjects);
             }
         }
+    }
 
-        if (!$this->options['debug_logging']) {
-            $this->enableLogging($logger);
-        }
+    /**
+     * {@inheritDoc}
+     */
+    protected function configureOptions()
+    {
+        parent::configureOptions();
+
+        $this->resolver->setDefaults(array(
+            'clear_object_manager' => true,
+            'debug_logging'        => false,
+            'ignore_errors'        => false,
+            'offset'               => 0,
+            'query_builder_method' => 'createQueryBuilder',
+            'sleep'                => 0
+        ));
     }
 
     /**
@@ -106,12 +144,13 @@ abstract class AbstractProvider extends BaseAbstractProvider
      * the fetchSlice methods defined in the ORM/MongoDB subclasses.
      *
      * @param $queryBuilder
-     * @param int $limit
-     * @param int $offset
+     * @param int   $limit
+     * @param int   $offset
      * @param array $lastSlice
+     *
      * @return array
      */
-    protected function getSlice($queryBuilder, $limit, $offset, $lastSlice)
+    private function getSlice($queryBuilder, $limit, $offset, $lastSlice)
     {
         if (!$this->sliceFetcher) {
             return $this->fetchSlice($queryBuilder, $limit, $offset);
@@ -130,44 +169,4 @@ abstract class AbstractProvider extends BaseAbstractProvider
             $identifierFieldNames
         );
     }
-
-    /**
-     * Counts objects that would be indexed using the query builder.
-     *
-     * @param object $queryBuilder
-     * @return integer
-     */
-    protected abstract function countObjects($queryBuilder);
-
-    /**
-     * Disables logging and returns the logger that was previously set.
-     *
-     * @return mixed
-     */
-    protected abstract function disableLogging();
-
-    /**
-     * Reenables the logger with the previously returned logger from disableLogging();
-     *
-     * @param mixed $logger
-     * @return mixed
-     */
-    protected abstract function enableLogging($logger);
-
-    /**
-     * Fetches a slice of objects using the query builder.
-     *
-     * @param object  $queryBuilder
-     * @param integer $limit
-     * @param integer $offset
-     * @return array
-     */
-    protected abstract function fetchSlice($queryBuilder, $limit, $offset);
-
-    /**
-     * Creates the query builder, which will be used to fetch objects to index.
-     *
-     * @return object
-     */
-    protected abstract function createQueryBuilder();
 }

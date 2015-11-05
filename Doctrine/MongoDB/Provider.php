@@ -27,9 +27,10 @@ class Provider extends AbstractProvider
     }
 
     /**
-     * Reenables the logger with the previously returned logger from disableLogging();
+     * Reenables the logger with the previously returned logger from disableLogging();.
      *
      * @param mixed $logger
+     *
      * @return mixed
      */
     protected function enableLogging($logger)
@@ -43,7 +44,7 @@ class Provider extends AbstractProvider
     }
 
     /**
-     * @see FOS\ElasticaBundle\Doctrine\AbstractProvider::countObjects()
+     * {@inheritDoc}
      */
     protected function countObjects($queryBuilder)
     {
@@ -57,7 +58,7 @@ class Provider extends AbstractProvider
     }
 
     /**
-     * @see FOS\ElasticaBundle\Doctrine\AbstractProvider::fetchSlice()
+     * {@inheritDoc}
      */
     protected function fetchSlice($queryBuilder, $limit, $offset)
     {
@@ -74,13 +75,13 @@ class Provider extends AbstractProvider
     }
 
     /**
-     * @see FOS\ElasticaBundle\Doctrine\AbstractProvider::createQueryBuilder()
+     * {@inheritDoc}
      */
-    protected function createQueryBuilder()
+    protected function createQueryBuilder($method)
     {
         return $this->managerRegistry
             ->getManagerForClass($this->objectClass)
             ->getRepository($this->objectClass)
-            ->{$this->options['query_builder_method']}();
+            ->{$method}();
     }
 }

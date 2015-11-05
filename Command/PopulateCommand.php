@@ -11,7 +11,6 @@
 namespace FOS\ElasticaBundle\Command;
 
 use FOS\ElasticaBundle\Event\IndexPopulateEvent;
-use FOS\ElasticaBundle\Event\PopulateEvent;
 use FOS\ElasticaBundle\Event\TypePopulateEvent;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Helper\DialogHelper;
@@ -24,7 +23,7 @@ use FOS\ElasticaBundle\Resetter;
 use Symfony\Component\Console\Helper\ProgressBar;
 
 /**
- * Populate the search index
+ * Populate the search index.
  */
 class PopulateCommand extends ContainerAwareCommand
 {
@@ -83,7 +82,7 @@ class PopulateCommand extends ContainerAwareCommand
         $this->resetter = $this->getContainer()->get('fos_elastica.resetter');
         $this->progressClosureBuilder = new ProgressClosureBuilder();
 
-        if (!$input->getOption('no-overwrite-format')) {
+        if (!$input->getOption('no-overwrite-format') && class_exists('Symfony\\Component\\Console\\Helper\\ProgressBar')) {
             ProgressBar::setFormatDefinition('normal', " %current%/%max% [%bar%] %percent:3s%%\n%message%");
             ProgressBar::setFormatDefinition('verbose', " %current%/%max% [%bar%] %percent:3s%% %elapsed:6s%\n%message%");
             ProgressBar::setFormatDefinition('very_verbose', " %current%/%max% [%bar%] %percent:3s%% %elapsed:6s%/%estimated:-6s%\n%message%");
@@ -99,8 +98,14 @@ class PopulateCommand extends ContainerAwareCommand
         $index = $input->getOption('index');
         $type = $input->getOption('type');
         $reset = !$input->getOption('no-reset');
-        $options = $input->getOptions();
-        $options['ignore-errors'] = $input->getOption('ignore-errors');
+        $options = array(
+            'ignore_errors' => $input->getOption('ignore-errors'),
+            'offset' => $input->getOption('offset'),
+            'sleep' => $input->getOption('sleep')
+        );
+        if ($input->getOption('batch-size')) {
+            $options['batch_size'] = (int) $input->getOption('batch-size');
+        }
 
         if ($input->isInteractive() && $reset && $input->getOption('offset')) {
             /** @var DialogHelper $dialog */
@@ -189,8 +194,8 @@ class PopulateCommand extends ContainerAwareCommand
      * Refreshes an index.
      *
      * @param OutputInterface $output
-     * @param string $index
-     * @param bool $postPopulate
+     * @param string          $index
+     * @param bool            $postPopulate
      */
     private function refreshIndex(OutputInterface $output, $index, $postPopulate = true)
     {

@@ -24,13 +24,6 @@ class POPO
 
 class ObjectSerializerPersisterTest extends \PHPUnit_Framework_TestCase
 {
-    public function setUp()
-    {
-       if (!class_exists('Elastica\Type')) {
-           $this->markTestSkipped('The Elastica library classes are not available');
-       }
-    }
-
     public function testThatCanReplaceObject()
     {
         $transformer = $this->getTransformer();
@@ -119,7 +112,7 @@ class ObjectSerializerPersisterTest extends \PHPUnit_Framework_TestCase
     private function getTransformer()
     {
         $transformer = new ModelToElasticaIdentifierTransformer();
-        $transformer->setPropertyAccessor(PropertyAccess::getPropertyAccessor());
+        $transformer->setPropertyAccessor(PropertyAccess::createPropertyAccessor());
 
         return $transformer;
     }

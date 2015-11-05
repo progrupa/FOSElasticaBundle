@@ -2,7 +2,6 @@
 
 namespace FOS\ElasticaBundle\Tests\Command;
 
-
 use FOS\ElasticaBundle\Command\ResetCommand;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\NullOutput;
@@ -10,8 +9,8 @@ use Symfony\Component\DependencyInjection\Container;
 
 class ResetCommandTest extends \PHPUnit_Framework_TestCase
 {
+    private $command;
     private $resetter;
-
     private $indexManager;
 
     public function setup()
@@ -88,4 +87,4 @@ class ResetCommandTest extends \PHPUnit_Framework_TestCase
             new NullOutput()
         );
     }
-} 
+}

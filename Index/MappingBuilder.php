@@ -27,6 +27,7 @@ class MappingBuilder
      * Builds mappings for an entire index.
      *
      * @param IndexConfig $indexConfig
+     *
      * @return array
      */
     public function buildIndexMapping(IndexConfig $indexConfig)
@@ -37,13 +38,13 @@ class MappingBuilder
         }
 
         $mapping = array();
-        if ($typeMappings) {
+        if (!empty($typeMappings)) {
             $mapping['mappings'] = $typeMappings;
         }
         // 'warmers' => $indexConfig->getWarmers(),
 
         $settings = $indexConfig->getSettings();
-        if ($settings) {
+        if (!empty($settings)) {
             $mapping['settings'] = $settings;
         }
 
@@ -54,6 +55,7 @@ class MappingBuilder
      * Builds mappings for a single type.
      *
      * @param TypeConfig $typeConfig
+     *
      * @return array
      */
     public function buildTypeMapping(TypeConfig $typeConfig)
@@ -93,9 +95,9 @@ class MappingBuilder
             $mapping['_meta']['model'] = $typeConfig->getModel();
         }
 
-        if (!$mapping) {
+        if (empty($mapping)) {
             // Empty mapping, we want it encoded as a {} instead of a []
-            $mapping = new \stdClass;
+            $mapping = new \stdClass();
         }
 
         return $mapping;
