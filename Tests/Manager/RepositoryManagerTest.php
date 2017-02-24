@@ -29,11 +29,11 @@ class RepositoryManagerTest extends \PHPUnit_Framework_TestCase
             ->disableOriginalConstructor()
             ->getMock();
 
-        $entityName = 'FOS\ElasticaBundle\Tests\Manager\Entity';
+        $typeName = 'index/type';
 
         $manager = new RepositoryManager($readerMock);
-        $manager->addEntity($entityName, $finderMock);
-        $repository = $manager->getRepository($entityName);
+        $manager->addType($typeName, $finderMock);
+        $repository = $manager->getRepository($typeName);
         $this->assertInstanceOf('FOS\ElasticaBundle\Repository', $repository);
     }
 
@@ -49,11 +49,11 @@ class RepositoryManagerTest extends \PHPUnit_Framework_TestCase
             ->disableOriginalConstructor()
             ->getMock();
 
-        $entityName = 'FOS\ElasticaBundle\Tests\Manager\Entity';
+        $typeName = 'index/type';
 
         $manager = new RepositoryManager($readerMock);
-        $manager->addEntity($entityName, $finderMock, 'FOS\ElasticaBundle\Tests\Manager\CustomRepository');
-        $repository = $manager->getRepository($entityName);
+        $manager->addType($typeName, $finderMock, 'FOS\ElasticaBundle\Tests\Manager\CustomRepository');
+        $repository = $manager->getRepository($typeName);
         $this->assertInstanceOf('FOS\ElasticaBundle\Tests\Manager\CustomRepository', $repository);
     }
 
@@ -72,11 +72,11 @@ class RepositoryManagerTest extends \PHPUnit_Framework_TestCase
             ->disableOriginalConstructor()
             ->getMock();
 
-        $entityName = 'FOS\ElasticaBundle\Tests\Manager\Entity';
+        $typeName = 'index/type';
 
         $manager = new RepositoryManager($readerMock);
-        $manager->addEntity($entityName, $finderMock);
-        $manager->getRepository('Missing Entity');
+        $manager->addType($typeName, $finderMock);
+        $manager->getRepository('Missing type');
     }
 
     /**
@@ -94,10 +94,10 @@ class RepositoryManagerTest extends \PHPUnit_Framework_TestCase
             ->disableOriginalConstructor()
             ->getMock();
 
-        $entityName = 'FOS\ElasticaBundle\Tests\Manager\Entity';
+        $typeName = 'index/type';
 
         $manager = new RepositoryManager($readerMock);
-        $manager->addEntity($entityName, $finderMock, 'FOS\ElasticaBundle\Tests\MissingRepository');
-        $manager->getRepository('Missing Entity');
+        $manager->addType($typeName, $finderMock, 'FOS\ElasticaBundle\Tests\MissingRepository');
+        $manager->getRepository($typeName);
     }
 }

@@ -12,8 +12,12 @@ use FOS\ElasticaBundle\Finder\PaginatedFinderInterface;
  */
 class Repository
 {
+    /** @var PaginatedFinderInterface */
     protected $finder;
 
+    /**
+     * @param PaginatedFinderInterface $finder
+     */
     public function __construct(PaginatedFinderInterface $finder)
     {
         $this->finder = $finder;
@@ -63,5 +67,15 @@ class Repository
     public function createPaginatorAdapter($query, $options = array())
     {
         return $this->finder->createPaginatorAdapter($query, $options);
+    }
+
+    /**
+     * @param mixed $query
+     *
+     * @return Paginator\HybridPaginatorAdapter
+     */
+    public function createHybridPaginatorAdapter($query)
+    {
+        return $this->finder->createHybridPaginatorAdapter($query);
     }
 }

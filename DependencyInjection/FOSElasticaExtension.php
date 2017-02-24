@@ -2,6 +2,7 @@
 
 namespace FOS\ElasticaBundle\DependencyInjection;
 
+use Symfony\Component\DependencyInjection\ContainerAwareInterface;
 use Symfony\Component\HttpKernel\DependencyInjection\Extension;
 use Symfony\Component\DependencyInjection\Loader\XmlFileLoader;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -110,6 +111,7 @@ class FOSElasticaExtension extends Extension
             if (false !== $logger) {
                 $clientDef->addMethodCall('setLogger', array(new Reference($logger)));
             }
+
             $clientDef->addTag('fos_elastica.client');
 
             $container->setDefinition($clientId, $clientDef);
@@ -140,29 +142,16 @@ class FOSElasticaExtension extends Extension
             $indexName = isset($index['index_name']) ? $index['index_name'] : $name;
 
             $indexDef = new DefinitionDecorator('fos_elastica.index_prototype');
+            $indexDef->setFactory(array(new Reference('fos_elastica.client'), 'getIndex'));
             $indexDef->replaceArgument(0, $indexName);
             $indexDef->addTag('fos_elastica.index', array(
                 'name' => $name,
             ));
 
-            if (method_exists($indexDef, 'setFactory')) {
-                $indexDef->setFactory(array(new Reference('fos_elastica.client'), 'getIndex'));
-            } else {
-                // To be removed when dependency on Symfony DependencyInjection is bumped to 2.6
-                $indexDef->setFactoryService('fos_elastica.client');
-                $indexDef->setFactoryMethod('getIndex');
-            }
-
             if (isset($index['client'])) {
                 $client = $this->getClient($index['client']);
 
-                if (method_exists($indexDef, 'setFactory')) {
-                    $indexDef->setFactory(array($client, 'getIndex'));
-                } else {
-                    // To be removed when dependency on Symfony DependencyInjection is bumped to 2.6
-                    $indexDef->setFactoryService($client);
-                    $indexDef->setFactoryMethod('getIndex');
-                }
+                $indexDef->setFactory(array($client, 'getIndex'));
             }
 
             $container->setDefinition($indexId, $indexDef);
@@ -229,15 +218,8 @@ class FOSElasticaExtension extends Extension
 
             $typeId = sprintf('%s.%s', $indexConfig['reference'], $name);
             $typeDef = new DefinitionDecorator('fos_elastica.type_prototype');
+            $typeDef->setFactory(array($indexConfig['reference'], 'getType'));
             $typeDef->replaceArgument(0, $name);
-
-            if (method_exists($typeDef, 'setFactory')) {
-                $typeDef->setFactory(array($indexConfig['reference'], 'getType'));
-            } else {
-                // To be removed when dependency on Symfony DependencyInjection is bumped to 2.6
-                $typeDef->setFactoryService($indexConfig['reference']);
-                $typeDef->setFactoryMethod('getType');
-            }
 
             $container->setDefinition($typeId, $typeDef);
 
@@ -267,8 +249,9 @@ class FOSElasticaExtension extends Extension
             foreach (array(
                 'persistence',
                 'serializer',
-                'index_analyzer',
+                'analyzer',
                 'search_analyzer',
+                'dynamic',
                 'date_detection',
                 'dynamic_date_formats',
                 'numeric_detection',
@@ -286,6 +269,11 @@ class FOSElasticaExtension extends Extension
                 $typeConfig['persistence'] = $type['persistence'];
             }
 
+            if (isset($type['_parent'])) {
+                // _parent mapping cannot contain `property` and `identifier`, so removing them after building `persistence`
+                unset($indexConfig['types'][$name]['mapping']['_parent']['property'], $indexConfig['types'][$name]['mapping']['_parent']['identifier']);
+            }
+
             if (isset($type['indexable_callback'])) {
                 $indexableCallbacks[sprintf('%s/%s', $indexName, $name)] = $type['indexable_callback'];
             }
@@ -297,6 +285,11 @@ class FOSElasticaExtension extends Extension
                 if (isset($type['serializer']['groups'])) {
                     $typeSerializerDef->addMethodCall('setGroups', array($type['serializer']['groups']));
                 }
+
+                if (isset($type['serializer']['serialize_null'])) {
+                    $typeSerializerDef->addMethodCall('setSerializeNull', array($type['serializer']['serialize_null']));
+                }
+
                 if (isset($type['serializer']['version'])) {
                     $typeSerializerDef->addMethodCall('setVersion', array($type['serializer']['version']));
                 }
@@ -526,6 +519,9 @@ class FOSElasticaExtension extends Extension
             case 'orm':
                 $tagName = 'doctrine.event_listener';
                 break;
+            case 'phpcr':
+                $tagName = 'doctrine_phpcr.event_listener';
+                break;
             case 'mongodb':
                 $tagName = 'doctrine_mongodb.odm.event_listener';
                 break;
@@ -550,6 +546,9 @@ class FOSElasticaExtension extends Extension
         switch ($typeConfig['driver']) {
             case 'orm':
                 $eventsClass = '\Doctrine\ORM\Events';
+                break;
+            case 'phpcr':
+                $eventsClass = '\Doctrine\ODM\PHPCR\Event';
                 break;
             case 'mongodb':
                 $eventsClass = '\Doctrine\ODM\MongoDB\Events';
@@ -599,13 +598,18 @@ class FOSElasticaExtension extends Extension
             $container->setDefinition($finderId, $finderDef);
         }
 
-        $managerId = sprintf('fos_elastica.manager.%s', $typeConfig['driver']);
-        $managerDef = $container->getDefinition($managerId);
-        $arguments = array( $typeConfig['model'], new Reference($finderId));
+        $indexTypeName = "$indexName/$typeName";
+        $arguments = [$indexTypeName, new Reference($finderId)];
         if (isset($typeConfig['repository'])) {
             $arguments[] = $typeConfig['repository'];
         }
-        $managerDef->addMethodCall('addEntity', $arguments);
+
+        $container->getDefinition('fos_elastica.repository_manager')
+            ->addMethodCall('addType', $arguments);
+
+        $managerId = sprintf('fos_elastica.manager.%s', $typeConfig['driver']);
+        $container->getDefinition($managerId)
+            ->addMethodCall('addEntity', [$typeConfig['model'], $indexTypeName]);
 
         return $finderId;
     }
@@ -655,8 +659,7 @@ class FOSElasticaExtension extends Extension
         $serializer = $container->getDefinition('fos_elastica.serializer_callback_prototype');
         $serializer->setClass($config['callback_class']);
 
-        $callbackClassImplementedInterfaces = class_implements($config['callback_class']);
-        if (isset($callbackClassImplementedInterfaces['Symfony\Component\DependencyInjection\ContainerAwareInterface'])) {
+        if (is_subclass_of($config['callback_class'], ContainerAwareInterface::class)) {
             $serializer->addMethodCall('setContainer', array(new Reference('service_container')));
         }
     }

@@ -3,6 +3,7 @@
 namespace FOS\ElasticaBundle\Provider;
 
 use Symfony\Component\DependencyInjection\ContainerAwareInterface;
+use Symfony\Component\DependencyInjection\ContainerAwareTrait;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -10,10 +11,9 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  */
 class ProviderRegistry implements ContainerAwareInterface
 {
-    /**
-     * @var ContainerInterface
-     */
-    private $container;
+    use ContainerAwareTrait;
+    
+    /** @var array */
     private $providers = array();
 
     /**
@@ -95,13 +95,5 @@ class ProviderRegistry implements ContainerAwareInterface
         }
 
         return $this->container->get($this->providers[$index][$type]);
-    }
-
-    /**
-     * @see Symfony\Component\DependencyInjection\ContainerAwareInterface::setContainer()
-     */
-    public function setContainer(ContainerInterface $container = null)
-    {
-        $this->container = $container;
     }
 }

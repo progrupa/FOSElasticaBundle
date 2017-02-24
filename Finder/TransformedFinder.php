@@ -3,6 +3,7 @@
 namespace FOS\ElasticaBundle\Finder;
 
 use Elastica\Document;
+use FOS\ElasticaBundle\Paginator\HybridPaginatorAdapter;
 use FOS\ElasticaBundle\Transformer\ElasticaToModelTransformerInterface;
 use FOS\ElasticaBundle\Paginator\TransformedPaginatorAdapter;
 use FOS\ElasticaBundle\Paginator\FantaPaginatorAdapter;
@@ -18,6 +19,10 @@ class TransformedFinder implements PaginatedFinderInterface
     protected $searchable;
     protected $transformer;
 
+    /**
+     * @param SearchableInterface                 $searchable
+     * @param ElasticaToModelTransformerInterface $transformer
+     */
     public function __construct(SearchableInterface $searchable, ElasticaToModelTransformerInterface $transformer)
     {
         $this->searchable  = $searchable;
@@ -25,14 +30,8 @@ class TransformedFinder implements PaginatedFinderInterface
     }
 
     /**
-     * Search for a query string.
-     *
-     * @param string  $query
-     * @param integer $limit
-     * @param array   $options
-     *
-     * @return array of model objects
-     **/
+     * {@inheritdoc}
+     */
     public function find($query, $limit = null, $options = array())
     {
         $results = $this->search($query, $limit, $options);
@@ -83,12 +82,7 @@ class TransformedFinder implements PaginatedFinderInterface
     }
 
     /**
-     * Gets a paginator wrapping the result of a search.
-     *
-     * @param string $query
-     * @param array  $options
-     *
-     * @return Pagerfanta
+     * {@inheritdoc}
      */
     public function findPaginated($query, $options = array())
     {
@@ -106,5 +100,15 @@ class TransformedFinder implements PaginatedFinderInterface
         $query = Query::create($query);
 
         return new TransformedPaginatorAdapter($this->searchable, $query, $options, $this->transformer);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function createHybridPaginatorAdapter($query)
+    {
+        $query = Query::create($query);
+
+        return new HybridPaginatorAdapter($this->searchable, $query, $this->transformer);
     }
 }

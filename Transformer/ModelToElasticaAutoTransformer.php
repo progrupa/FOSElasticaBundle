@@ -67,7 +67,7 @@ class ModelToElasticaAutoTransformer implements ModelToElasticaTransformerInterf
      **/
     public function transform($object, array $fields)
     {
-        $identifier = $this->propertyAccessor->getValue($object, $this->options['identifier']);
+        $identifier = (string) $this->propertyAccessor->getValue($object, $this->options['identifier']);
         $document = $this->transformObjectToDocument($object, $fields, $identifier);
 
         return $document;
@@ -138,6 +138,13 @@ class ModelToElasticaAutoTransformer implements ModelToElasticaTransformerInterf
     protected function transformObjectToDocument($object, array $fields, $identifier = '')
     {
         $document = new Document($identifier);
+
+        if ($this->dispatcher) {
+            $event = new TransformEvent($document, $fields, $object);
+            $this->dispatcher->dispatch(TransformEvent::PRE_TRANSFORM, $event);
+
+            $document = $event->getDocument();
+        }
 
         foreach ($fields as $key => $mapping) {
             if ($key == '_parent') {

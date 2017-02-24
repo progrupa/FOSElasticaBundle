@@ -1,26 +1,19 @@
 <?php
-/**
- * This file is part of the FOSElasticaBundle project.
- *
- * (c) Tim Nagel <tim@nagel.com.au>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
- */
 
 namespace FOS\ElasticaBundle\Command;
 
 use FOS\ElasticaBundle\Event\IndexPopulateEvent;
 use FOS\ElasticaBundle\Event\TypePopulateEvent;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
-use Symfony\Component\Console\Helper\DialogHelper;
+use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use FOS\ElasticaBundle\IndexManager;
+use FOS\ElasticaBundle\Index\IndexManager;
 use FOS\ElasticaBundle\Provider\ProviderRegistry;
-use FOS\ElasticaBundle\Resetter;
+use FOS\ElasticaBundle\Index\Resetter;
 use Symfony\Component\Console\Helper\ProgressBar;
+use Symfony\Component\Console\Question\Question;
 
 /**
  * Populate the search index.
@@ -108,9 +101,9 @@ class PopulateCommand extends ContainerAwareCommand
         }
 
         if ($input->isInteractive() && $reset && $input->getOption('offset')) {
-            /** @var DialogHelper $dialog */
-            $dialog = $this->getHelperSet()->get('dialog');
-            if (!$dialog->askConfirmation($output, '<question>You chose to reset the index and start indexing with an offset. Do you really want to do that?</question>', true)) {
+            /** @var QuestionHelper $dialog */
+            $dialog = $this->getHelperSet()->get('question');
+            if (!$dialog->ask($input, $output, new Question('<question>You chose to reset the index and start indexing with an offset. Do you really want to do that?</question>'))) {
                 return;
             }
         }
@@ -159,7 +152,7 @@ class PopulateCommand extends ContainerAwareCommand
 
         $this->dispatcher->dispatch(IndexPopulateEvent::POST_INDEX_POPULATE, $event);
 
-        $this->refreshIndex($output, $index);
+        $this->refreshIndex($output, $index, $reset);
     }
 
     /**
@@ -181,8 +174,9 @@ class PopulateCommand extends ContainerAwareCommand
             $this->resetter->resetIndexType($index, $type);
         }
 
+        $offset = $options['offset'];
         $provider = $this->providerRegistry->getProvider($index, $type);
-        $loggerClosure = $this->progressClosureBuilder->build($output, '<info>Populating</info> <comment>%s/%s</comment>', array($index, $type));
+        $loggerClosure = $this->progressClosureBuilder->build($output, 'Populating', $index, $type, $offset);
         $provider->populate($loggerClosure, $event->getOptions());
 
         $this->dispatcher->dispatch(TypePopulateEvent::POST_TYPE_POPULATE, $event);

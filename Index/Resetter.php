@@ -89,12 +89,12 @@ class Resetter
         $indexConfig = $this->configManager->getIndexConfiguration($indexName);
         $index = $this->indexManager->getIndex($indexName);
 
-        $event = new IndexResetEvent($indexName, $populating, $force);
-        $this->dispatcher->dispatch(IndexResetEvent::PRE_INDEX_RESET, $event);
-
         if ($indexConfig->isUseAlias()) {
             $this->aliasProcessor->setRootName($indexConfig, $index);
         }
+
+        $event = new IndexResetEvent($indexName, $populating, $force);
+        $this->dispatcher->dispatch(IndexResetEvent::PRE_INDEX_RESET, $event);
 
         $mapping = $this->mappingBuilder->buildIndexMapping($indexConfig);
         $index->create($mapping, true);
@@ -118,17 +118,21 @@ class Resetter
     public function resetIndexType($indexName, $typeName)
     {
         $typeConfig = $this->configManager->getTypeConfiguration($indexName, $typeName);
-        $type = $this->indexManager->getIndex($indexName)->getType($typeName);
+
+        $this->resetIndex($indexName, true);
+
+        $index = $this->indexManager->getIndex($indexName);
+        $type = $index->getType($typeName);
 
         $event = new TypeResetEvent($indexName, $typeName);
         $this->dispatcher->dispatch(TypeResetEvent::PRE_TYPE_RESET, $event);
 
-        try {
-            $type->delete();
-        } catch (ResponseException $e) {
-            if (strpos($e->getMessage(), 'TypeMissingException') === false) {
-                throw $e;
-            }
+        if (!empty($settings)) {
+            unset($settings['number_of_shards'], $settings['index']['number_of_shards']);
+            unset($settings['number_of_replicas'], $settings['index']['number_of_replicas']);
+            $index->close();
+            $index->setSettings($settings);
+            $index->open();
         }
 
         $mapping = new Mapping();

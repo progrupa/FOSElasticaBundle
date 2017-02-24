@@ -45,8 +45,8 @@ abstract class AbstractElasticaToModelTransformer extends BaseTransformer
      * Instantiates a new Mapper.
      *
      * @param ManagerRegistry $registry
-     * @param string $objectClass
-     * @param array  $options
+     * @param string          $objectClass
+     * @param array           $options
      */
     public function __construct(ManagerRegistry $registry, $objectClass, array $options = array())
     {
@@ -84,20 +84,36 @@ abstract class AbstractElasticaToModelTransformer extends BaseTransformer
         }
 
         $objects = $this->findByIdentifiers($ids, $this->options['hydrate']);
-        if (!$this->options['ignore_missing'] && count($objects) < count($elasticaObjects)) {
-            throw new \RuntimeException('Cannot find corresponding Doctrine objects for all Elastica results.');
+        $objectsCnt = count($objects);
+        $elasticaObjectsCnt = count($elasticaObjects);
+        if (!$this->options['ignore_missing'] && $objectsCnt < $elasticaObjectsCnt) {
+            throw new \RuntimeException(sprintf('Cannot find corresponding Doctrine objects (%d) for all Elastica results (%d). IDs: %s', $objectsCnt, $elasticaObjectsCnt, join(', ', $ids)));
         };
 
+        $propertyAccessor = $this->propertyAccessor;
+        $identifier = $this->options['identifier'];
         foreach ($objects as $object) {
             if ($object instanceof HighlightableModelInterface) {
-                $object->setElasticHighlights($highlights[$object->getId()]);
+                $id = $propertyAccessor->getValue($object, $identifier);
+                $object->setElasticHighlights($highlights[(string) $id]);
             }
         }
 
         // sort objects in the order of ids
         $idPos = array_flip($ids);
-        $identifier = $this->options['identifier'];
-        usort($objects, $this->getSortingClosure($idPos, $identifier));
+        usort(
+            $objects,
+            function ($a, $b) use ($idPos, $identifier, $propertyAccessor) {
+                if ($this->options['hydrate']) {
+                    return $idPos[(string)$propertyAccessor->getValue(
+                        $a,
+                        $identifier
+                    )] > $idPos[(string)$propertyAccessor->getValue($b, $identifier)];
+                } else {
+                    return $idPos[$a[$identifier]] > $idPos[$b[$identifier]];
+                }
+            }
+        );
 
         return $objects;
     }
@@ -106,15 +122,19 @@ abstract class AbstractElasticaToModelTransformer extends BaseTransformer
     {
         $indexedElasticaResults = array();
         foreach ($elasticaObjects as $elasticaObject) {
-            $indexedElasticaResults[$elasticaObject->getId()] = $elasticaObject;
+            $indexedElasticaResults[(string) $elasticaObject->getId()] = $elasticaObject;
         }
 
         $objects = $this->transform($elasticaObjects);
 
         $result = array();
         foreach ($objects as $object) {
-            $id = $this->propertyAccessor->getValue($object, $this->options['identifier']);
-            $result[] = new HybridResult($indexedElasticaResults[$id], $object);
+            if ($this->options['hydrate']) {
+                $id = $this->propertyAccessor->getValue($object, $this->options['identifier']);
+            } else {
+                $id = $object[$this->options['identifier']];
+            }
+            $result[] = new HybridResult($indexedElasticaResults[(string) $id], $object);
         }
 
         return $result;

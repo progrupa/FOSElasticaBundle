@@ -24,60 +24,62 @@ class ProgressClosureBuilder
      * @param string          $action
      * @param string          $index
      * @param string          $type
+     * @param integer         $offset
      *
      * @return callable
      */
-    public function build(OutputInterface $output, $action, array $actionParameters = array())
+    public function build(OutputInterface $output, $action, $index, $type, $offset)
     {
-	    $actionMessage = vsprintf($action, $actionParameters);
-	    if (!class_exists('Symfony\Component\Console\Helper\ProgressBar') ||
+        if (!class_exists('Symfony\Component\Console\Helper\ProgressBar') ||
             !is_callable(array('Symfony\Component\Console\Helper\ProgressBar', 'getProgress'))) {
-            return $this->buildLegacy($output, $actionMessage);
+            return $this->buildLegacy($output, $action, $index, $type, $offset);
         }
 
         $progress = null;
 
-        return function ($increment, $totalObjects, $message = null) use (&$progress, $output, $actionMessage) {
+        return function ($increment, $totalObjects, $message = null) use (&$progress, $output, $action, $index, $type, $offset) {
             if (null === $progress) {
                 $progress = new ProgressBar($output, $totalObjects);
                 $progress->start();
+                $progress->setProgress($offset);
             }
 
             if (null !== $message) {
                 $progress->clear();
-                $output->writeln(sprintf('<info>%s</info> <error>%s</error>', $actionMessage, $message));
+                $output->writeln(sprintf('<info>%s</info> <error>%s</error>', $action, $message));
                 $progress->display();
             }
 
-            $progress->setMessage($actionMessage);
+            $progress->setMessage(sprintf('<info>%s</info> <comment>%s/%s</comment>', $action, $index, $type));
             $progress->advance($increment);
         };
     }
 
     /**
      * Builds a legacy closure that outputs lines for each step. Used in cases
-     * where the ProgressBar component doesnt exist or does not have the correct
+     * where the ProgressBar component doesn't exist or does not have the correct
      * methods to support what we need.
      *
      * @param OutputInterface $output
      * @param string          $action
      * @param string          $index
      * @param string          $type
+     * @param integer         $offset
      *
      * @return callable
      */
-    private function buildLegacy(OutputInterface $output, $actionMessage)
+    private function buildLegacy(OutputInterface $output, $action, $index, $type, $offset)
     {
         $lastStep = null;
-        $current = 0;
+        $current = $offset;
 
-        return function ($increment, $totalObjects, $message = null) use ($output, $actionMessage, &$lastStep, &$current) {
+        return function ($increment, $totalObjects, $message = null) use ($output, $action, $index, $type, &$lastStep, &$current) {
             if ($current + $increment > $totalObjects) {
                 $increment = $totalObjects - $current;
             }
 
             if (null !== $message) {
-                $output->writeln(sprintf('<info>%s</info> <error>%s</error>', $actionMessage, $message));
+                $output->writeln(sprintf('<info>%s</info> <error>%s</error>', $action, $message));
             }
 
             $currentTime = microtime(true);
@@ -88,8 +90,10 @@ class ProgressClosureBuilder
             $percent = 100 * $current / $totalObjects;
 
             $output->writeln(sprintf(
-                '%s %0.1f%% (%d/%d), %d objects/s (RAM: current=%uMo peak=%uMo)',
-                $actionMessage,
+                '<info>%s</info> <comment>%s/%s</comment> %0.1f%% (%d/%d), %d objects/s (RAM: current=%uMo peak=%uMo)',
+                $action,
+                $index,
+                $type,
                 $percent,
                 $current,
                 $totalObjects,

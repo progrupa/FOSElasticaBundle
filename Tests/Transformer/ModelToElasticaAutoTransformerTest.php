@@ -92,7 +92,7 @@ class POPO
 
     public function getFileContents()
     {
-        return $this->file;
+        return $this->fileContents;
     }
 
     public function getSub()
@@ -137,17 +137,34 @@ class POPO
     }
 }
 
+class CastableObject
+{
+    public $foo;
+
+    public function __toString()
+    {
+        return $this->foo;
+    }
+}
+
 class ModelToElasticaAutoTransformerTest extends \PHPUnit_Framework_TestCase
 {
     public function testTransformerDispatches()
     {
         $dispatcher = $this->getMockBuilder('Symfony\Component\EventDispatcher\EventDispatcherInterface')
             ->getMock();
-        $dispatcher->expects($this->once())
+
+        $dispatcher->expects($this->exactly(2))
             ->method('dispatch')
-            ->with(
-                TransformEvent::POST_TRANSFORM,
-                $this->isInstanceOf('FOS\ElasticaBundle\Event\TransformEvent')
+            ->withConsecutive(
+                array(
+                    TransformEvent::PRE_TRANSFORM,
+                    $this->isInstanceOf('FOS\ElasticaBundle\Event\TransformEvent')
+                ),
+                array(
+                    TransformEvent::POST_TRANSFORM,
+                    $this->isInstanceOf('FOS\ElasticaBundle\Event\TransformEvent')
+                )
             );
 
         $transformer = $this->getTransformer($dispatcher);
@@ -389,7 +406,7 @@ class ModelToElasticaAutoTransformerTest extends \PHPUnit_Framework_TestCase
             '_parent' => array('type' => 'upper', 'property' => 'upper', 'identifier' => 'id'),
         ));
 
-        $this->assertEquals("parent", $document->getParent());
+        $this->assertEquals('parent', $document->getParent());
     }
 
     public function testParentMappingWithCustomIdentifier()
@@ -399,7 +416,7 @@ class ModelToElasticaAutoTransformerTest extends \PHPUnit_Framework_TestCase
             '_parent' => array('type' => 'upper', 'property' => 'upper', 'identifier' => 'name'),
         ));
 
-        $this->assertEquals("a random name", $document->getParent());
+        $this->assertEquals('a random name', $document->getParent());
     }
 
     public function testParentMappingWithNullProperty()
@@ -409,7 +426,7 @@ class ModelToElasticaAutoTransformerTest extends \PHPUnit_Framework_TestCase
             '_parent' => array('type' => 'upper', 'property' => null, 'identifier' => 'id'),
         ));
 
-        $this->assertEquals("parent", $document->getParent());
+        $this->assertEquals('parent', $document->getParent());
     }
 
     public function testParentMappingWithCustomProperty()
@@ -419,7 +436,7 @@ class ModelToElasticaAutoTransformerTest extends \PHPUnit_Framework_TestCase
             '_parent' => array('type' => 'upper', 'property' => 'upperAlias', 'identifier' => 'id'),
         ));
 
-        $this->assertEquals("parent", $document->getParent());
+        $this->assertEquals('parent', $document->getParent());
     }
 
     public function testThatMappedObjectsDontNeedAnIdentifierField()
@@ -464,6 +481,54 @@ class ModelToElasticaAutoTransformerTest extends \PHPUnit_Framework_TestCase
             array('foo' => 'foo', 'bar' => 'foo'),
             array('foo' => 'bar', 'bar' => 'bar'),
         ), $data['subWithoutIdentifier']);
+    }
+
+    public function testNestedTransformHandlesSingleObjects()
+    {
+        $transformer = $this->getTransformer();
+        $document    = $transformer->transform(new POPO(), array(
+            'upper' => array(
+                'type' => 'nested',
+                'properties' => array('name' => null)
+            )
+        ));
+
+        $data = $document->getData();
+        $this->assertEquals('a random name', $data['upper']['name']);
+    }
+
+    public function testNestedTransformReturnsAnEmptyArrayForNullValues()
+    {
+        $transformer = $this->getTransformer();
+        $document    = $transformer->transform(new POPO(), array(
+            'nullValue' => array(
+                'type' => 'nested',
+                'properties' => array(
+                    'foo' => array(),
+                    'bar' => array()
+                ),
+            )
+        ));
+
+        $data = $document->getData();
+        $this->assertInternalType('array', $data['nullValue']);
+        $this->assertEmpty($data['nullValue']);
+    }
+
+    public function testUnmappedFieldValuesAreNormalisedToStrings()
+    {
+        $object = new \stdClass();
+        $value = new CastableObject();
+        $value->foo = 'bar';
+
+        $object->id = 123;
+        $object->unmappedValue = $value;
+
+        $transformer = $this->getTransformer();
+        $document    = $transformer->transform($object, array('unmappedValue' => array('property' => 'unmappedValue')));
+
+        $data = $document->getData();
+        $this->assertEquals('bar', $data['unmappedValue']);
     }
 
     /**

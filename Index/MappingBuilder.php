@@ -74,12 +74,12 @@ class MappingBuilder
             $mapping['numeric_detection'] = $typeConfig->getNumericDetection();
         }
 
-        if ($typeConfig->getIndexAnalyzer()) {
-            $mapping['index_analyzer'] = $typeConfig->getIndexAnalyzer();
+        if ($typeConfig->getAnalyzer()) {
+            $mapping['analyzer'] = $typeConfig->getAnalyzer();
         }
 
-        if ($typeConfig->getSearchAnalyzer()) {
-            $mapping['search_analyzer'] = $typeConfig->getSearchAnalyzer();
+        if ($typeConfig->getDynamic() !== null) {
+            $mapping['dynamic'] = $typeConfig->getDynamic();
         }
 
         if (isset($mapping['dynamic_templates']) and empty($mapping['dynamic_templates'])) {
@@ -95,9 +95,11 @@ class MappingBuilder
             $mapping['_meta']['model'] = $typeConfig->getModel();
         }
 
+        unset($mapping['_parent']['identifier'], $mapping['_parent']['property']);
+
         if (empty($mapping)) {
             // Empty mapping, we want it encoded as a {} instead of a []
-            $mapping = new \stdClass();
+            $mapping = new \ArrayObject();
         }
 
         return $mapping;
@@ -125,9 +127,6 @@ class MappingBuilder
             }
             if (in_array($property['type'], $this->skipTypes)) {
                 continue;
-            }
-            if (!isset($property['store'])) {
-                $property['store'] = true;
             }
         }
     }

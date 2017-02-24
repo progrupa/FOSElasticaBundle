@@ -28,6 +28,11 @@ class TypeConfig
      */
     private $name;
 
+    /**
+     * @param string $name
+     * @param array  $mapping
+     * @param array  $config
+     */
     public function __construct($name, array $mapping, array $config = array())
     {
         $this->config = $config;
@@ -54,9 +59,9 @@ class TypeConfig
     /**
      * @return string|null
      */
-    public function getIndexAnalyzer()
+    public function getAnalyzer()
     {
-        return $this->getConfig('index_analyzer');
+        return $this->getConfig('analyzer');
     }
 
     /**
@@ -96,13 +101,15 @@ class TypeConfig
     /**
      * @return string|null
      */
-    public function getSearchAnalyzer()
+    public function getDynamic()
     {
-        return $this->getConfig('search_analyzer');
+        return $this->getConfig('dynamic');
     }
 
     /**
      * @param string $key
+     *
+     * @return null|string
      */
     private function getConfig($key)
     {

@@ -17,11 +17,17 @@ class ElasticaToModelTransformerCollection implements ElasticaToModelTransformer
      */
     protected $transformers = array();
 
+    /**
+     * @param array $transformers
+     */
     public function __construct(array $transformers)
     {
         $this->transformers = $transformers;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function getObjectClass()
     {
         return array_map(function (ElasticaToModelTransformerInterface $transformer) {
@@ -40,9 +46,7 @@ class ElasticaToModelTransformerCollection implements ElasticaToModelTransformer
     }
 
     /**
-     * @param Document[] $elasticaObjects
-     *
-     * @return array
+     * {@inheritdoc}
      */
     public function transform(array $elasticaObjects)
     {
@@ -68,14 +72,17 @@ class ElasticaToModelTransformerCollection implements ElasticaToModelTransformer
 
         $result = array();
         foreach ($elasticaObjects as $object) {
-            if (array_key_exists($object->getId(), $transformed[$object->getType()])) {
-                $result[] = $transformed[$object->getType()][$object->getId()];
+            if (array_key_exists((string) $object->getId(), $transformed[$object->getType()])) {
+                $result[] = $transformed[$object->getType()][(string) $object->getId()];
             }
         }
 
         return $result;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function hybridTransform(array $elasticaObjects)
     {
         $objects = $this->transform($elasticaObjects);

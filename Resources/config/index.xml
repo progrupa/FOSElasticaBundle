@@ -13,14 +13,19 @@
         <parameter key="fos_elastica.resetter.class">FOS\ElasticaBundle\Index\Resetter</parameter>
         <parameter key="fos_elastica.copier.class">FOS\ElasticaBundle\Index\Copier</parameter>
         <parameter key="fos_elastica.type.class">Elastica\Type</parameter>
+        <parameter key="fos_elastica.repository_manager.class">FOS\ElasticaBundle\Manager\RepositoryManager</parameter>
     </parameters>
 
     <services>
+        <service id="fos_elastica.repository_manager" class="%fos_elastica.repository_manager.class%" />
+
         <service id="fos_elastica.alias_processor" class="%fos_elastica.alias_processor.class%" />
 
         <service id="fos_elastica.indexable" class="%fos_elastica.indexable.class%">
             <argument type="collection" /> <!-- array of indexable callbacks keyed by type name -->
-            <argument type="service" id="service_container" />
+            <call method="setContainer">
+                <argument type="service" id="service_container" />
+            </call>
         </service>
 
         <service id="fos_elastica.index_prototype" class="%fos_elastica.index.class%" abstract="true">

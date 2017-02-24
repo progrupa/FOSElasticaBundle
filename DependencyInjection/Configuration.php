@@ -13,7 +13,7 @@ class Configuration implements ConfigurationInterface
      *
      * @var array
      */
-    private $supportedDrivers = array('orm', 'mongodb', 'propel');
+    private $supportedDrivers = array('orm', 'mongodb', 'propel', 'phpcr');
 
     /**
      * If the kernel is running in debug mode.
@@ -118,21 +118,31 @@ class Configuration implements ConfigurationInterface
                                         ->scalarNode('host')->end()
                                         ->scalarNode('port')->end()
                                         ->scalarNode('proxy')->end()
+                                        ->scalarNode('aws_access_key_id')->end()
+                                        ->scalarNode('aws_secret_access_key')->end()
+                                        ->scalarNode('aws_region')->end()
+                                        ->scalarNode('aws_session_token')->end()
                                         ->scalarNode('logger')
                                             ->defaultValue($this->debug ? 'fos_elastica.logger' : false)
                                             ->treatNullLike('fos_elastica.logger')
                                             ->treatTrueLike('fos_elastica.logger')
                                         ->end()
+                                        ->booleanNode('compression')->defaultValue(false)->end()
                                         ->arrayNode('headers')
                                             ->useAttributeAsKey('name')
                                             ->prototype('scalar')->end()
                                         ->end()
                                         ->scalarNode('transport')->end()
                                         ->scalarNode('timeout')->end()
+                                        ->scalarNode('connectTimeout')->end()
+                                        ->scalarNode('retryOnConflict')
+                                            ->defaultValue(0)
+                                        ->end()
                                     ->end()
                                 ->end()
                             ->end()
                             ->scalarNode('timeout')->end()
+                            ->scalarNode('connectTimeout')->end()
                             ->scalarNode('headers')->end()
                             ->scalarNode('connectionStrategy')->defaultValue('Simple')->end()
                         ->end()
@@ -165,8 +175,7 @@ class Configuration implements ConfigurationInterface
                             ->end()
                             ->arrayNode('type_prototype')
                                 ->children()
-                                    ->scalarNode('index_analyzer')->end()
-                                    ->scalarNode('search_analyzer')->end()
+                                    ->scalarNode('analyzer')->end()
                                     ->append($this->getPersistenceNode())
                                     ->append($this->getSerializerNode())
                                 ->end()
@@ -252,9 +261,9 @@ class Configuration implements ConfigurationInterface
                 ->children()
                     ->booleanNode('date_detection')->end()
                     ->arrayNode('dynamic_date_formats')->prototype('scalar')->end()->end()
-                    ->scalarNode('index_analyzer')->end()
+                    ->scalarNode('analyzer')->end()
                     ->booleanNode('numeric_detection')->end()
-                    ->scalarNode('search_analyzer')->end()
+                    ->scalarNode('dynamic')->end()
                     ->variableNode('indexable_callback')->end()
                     ->append($this->getPersistenceNode())
                     ->append($this->getSerializerNode())
@@ -432,8 +441,7 @@ class Configuration implements ConfigurationInterface
         $node
             ->children()
             ->scalarNode('enabled')->defaultValue(true)->end()
-            ->scalarNode('index_analyzer')->end()
-            ->scalarNode('search_analyzer')->end()
+            ->scalarNode('analyzer')->end()
             ->end()
         ;
 
@@ -490,6 +498,14 @@ class Configuration implements ConfigurationInterface
         $node = $builder->root('persistence');
 
         $node
+            ->beforeNormalization()
+                ->ifTrue(function($v) { return isset($v['immediate']); })
+                    ->then(function($v) {
+                        @trigger_error('The immediate configuration key is deprecated since version 3.2 and will be removed in 4.0.', E_USER_DEPRECATED);
+
+                        return $v;
+                    })
+            ->end()
             ->validate()
                 ->ifTrue(function ($v) { return isset($v['driver']) && 'propel' === $v['driver'] && isset($v['listener']); })
                     ->thenInvalid('Propel doesn\'t support listeners')
@@ -500,15 +516,17 @@ class Configuration implements ConfigurationInterface
             ->end()
             ->children()
                 ->scalarNode('driver')
+                    ->defaultValue('orm')
                     ->validate()
                     ->ifNotInArray($this->supportedDrivers)
                         ->thenInvalid('The driver %s is not supported. Please choose one of '.json_encode($this->supportedDrivers))
                     ->end()
                 ->end()
-                ->scalarNode('model')->end()
+                ->scalarNode('model')->defaultValue(null)->end()
                 ->scalarNode('repository')->end()
                 ->scalarNode('identifier')->defaultValue('id')->end()
                 ->arrayNode('provider')
+                    ->addDefaultsIfNotSet()
                     ->children()
                         ->scalarNode('batch_size')->defaultValue(100)->end()
                         ->scalarNode('clear_object_manager')->defaultTrue()->end()
@@ -521,6 +539,7 @@ class Configuration implements ConfigurationInterface
                     ->end()
                 ->end()
                 ->arrayNode('listener')
+                    ->addDefaultsIfNotSet()
                     ->children()
                         ->scalarNode('insert')->defaultTrue()->end()
                         ->scalarNode('update')->defaultTrue()->end()
@@ -536,6 +555,7 @@ class Configuration implements ConfigurationInterface
                     ->end()
                 ->end()
                 ->arrayNode('finder')
+                    ->addDefaultsIfNotSet()
                     ->children()
                         ->scalarNode('service')->end()
                     ->end()
@@ -593,6 +613,9 @@ class Configuration implements ConfigurationInterface
                     ->prototype('scalar')->end()
                 ->end()
                 ->scalarNode('version')->end()
+                ->booleanNode('serialize_null')
+                    ->defaultFalse()
+                ->end()
             ->end();
 
         return $node;

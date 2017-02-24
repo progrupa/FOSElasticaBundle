@@ -33,11 +33,6 @@ class RawPaginatorAdapter implements PaginatorAdapterInterface
     private $totalHits;
 
     /**
-     * @var array for the facets
-     */
-    private $facets;
-
-    /**
      * @var array for the aggregations
      */
     private $aggregations;
@@ -88,19 +83,14 @@ class RawPaginatorAdapter implements PaginatorAdapterInterface
 
         $resultSet = $this->searchable->search($query, $this->options);
         $this->totalHits = $resultSet->getTotalHits();
-        $this->facets = $resultSet->getFacets();
+
         $this->aggregations = $resultSet->getAggregations();
 
         return $resultSet;
     }
 
     /**
-     * Returns the paginated results.
-     *
-     * @param int $offset
-     * @param int $itemCountPerPage
-     *
-     * @return PartialResultsInterface
+     * {@inheritdoc}
      */
     public function getResults($offset, $itemCountPerPage)
     {
@@ -114,9 +104,7 @@ class RawPaginatorAdapter implements PaginatorAdapterInterface
      * hits.total value from the search results instead of just returning
      * the requested size.
      *
-     * @param boolean $genuineTotal
-     *
-     * @return integer The number of results.
+     * {@inheritdoc}
      */
     public function getTotalHits($genuineTotal = false)
     {
@@ -130,23 +118,7 @@ class RawPaginatorAdapter implements PaginatorAdapterInterface
     }
 
     /**
-     * Returns Facets.
-     *
-     * @return mixed
-     */
-    public function getFacets()
-    {
-        if (! isset($this->facets)) {
-            $this->facets = $this->searchable->search($this->query)->getFacets();
-        }
-
-        return $this->facets;
-    }
-
-    /**
-     * Returns Aggregations.
-     *
-     * @return mixed
+     * {@inheritdoc}
      */
     public function getAggregations()
     {
